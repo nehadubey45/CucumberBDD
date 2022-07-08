@@ -15,6 +15,10 @@ import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
+import com.visionit.automation.core.WebDriverFactory;
+import com.visionit.automation.pageobjects.CmnPageObjects;
+import com.visionit.automation.pageobjects.SearchPageObjects;
+
 import io.cucumber.java.After;
 import io.cucumber.java.Before;
 import io.cucumber.java.Scenario;
@@ -31,6 +35,9 @@ public class StepDefs {
 	int implicit_wait_timeout_in_sec = 20;
 	Scenario scn; // this is set in the @Before method
 	
+	CmnPageObjects cmnPageObjects;
+	SearchPageObjects searchPageObjects;
+	
     // make sure to use this before import io.cucumber.java.Before;
     // Use @Before to execute steps to be executed before each scnerio
     // one example can be to invoke the browser
@@ -38,14 +45,17 @@ public class StepDefs {
     //This object is 'Injected' at run time and can be used for logging, screen shot attachement to reports
     //Other than that it also carries steps and scenario pass, fail status(more on this later)
     @Before
-    public void setUp(Scenario scn){
+    public void setUp(Scenario scn) throws Exception{
     	this.scn = scn; // Assign this to class variable, so that it can be used in all the step def methods
-        driver = new ChromeDriver();
-        logger.info("Browser invoked");
-        driver.manage().window().maximize();
-        logger.info("Browser maximize");
-        driver.manage().timeouts().implicitlyWait(implicit_wait_timeout_in_sec, TimeUnit.SECONDS);
-        logger.info("Set Implicit wait as " + implicit_wait_timeout_in_sec);
+        //driver = new ChromeDriver();
+    	//Get the browser name by default it is chrome
+        String browserName = WebDriverFactory.getBrowserName();
+        driver = WebDriverFactory.getWebDriverForBrowser(browserName);
+        logger.info("Browser invoked.");
+        
+        cmnPageObjects = new CmnPageObjects(driver, scn);
+        searchPageObjects = new SearchPageObjects(driver,scn);
+        
     }
     
     // make sure to use this after import io.cucumber.java.After;
@@ -70,53 +80,28 @@ public class StepDefs {
 	    driver.get(base_url);
 	    logger.info("Browser navigated to URL: " + base_url);
 	    scn.log("Browser navigated to URL: " + base_url);
-	    
-	    String expected = "Online Shopping site in India: Shop Online for Mobiles, Books, Watches, Shoes and More - Amazon.in";
-	    String actual = driver.getTitle();
-	    Assert.assertEquals("Page Title validation", expected, actual);
-	    scn.log("Page Title validation successful. Actual title: " + actual);
-	    logger.info("Page Title validation successful. Actual title: " + actual);
+	    cmnPageObjects.ValidateLandingPageTitle();
 	}
 	
 	@When("User Search for product {string}")
 	public void user_search_for_product(String productName) {
 		//wait and search for product
-	  WebDriverWait webDriverWait = new WebDriverWait(driver,20);
-	 WebElement elementSearchBox = webDriverWait.until(ExpectedConditions.elementToBeClickable(By.id("twotabsearchtextbox")));
-	 logger.info("Created Webelement for searchbox");
-	 elementSearchBox.sendKeys(productName);
-	 logger.info("Sending keys as " + productName);
-	 scn.log("Product searched: " + productName);
-	 driver.findElement(By.xpath("//input[@value='Go']")).click();
-	 scn.log("Clicked on the Go button");
-	 logger.info("Clicked on the Go button");
+		cmnPageObjects.searchProduct(productName);
+		cmnPageObjects.clickOnSearchBtn();
 	}
 	
 	@Then("Search Result page is displayed")
 	public void search_result_page_is_displayed() {
 	    //wait for title
-		WebDriverWait webDriverWait1 = new WebDriverWait(driver,20);
-		logger.info("Waiting for page title: \"Amazon.in: Laptop\"");
-		webDriverWait1.until(ExpectedConditions.titleIs("Amazon.in : Laptop"));
-		
-		//Assertion for the page title
-		Assert.assertEquals("Page Title validation", "Amazon.in : Laptop", driver.getTitle());
-		scn.log("Page title validation successful: " + driver.getTitle());
-		logger.info("Page title validation successful: " + driver.getTitle());
+		searchPageObjects.validateSearchpageTitle();
+	
 	}
 	
 	
 	@When("User click on any product")
 	public void user_click_on_any_product() {
 		//listOfProducts will have all the links displayed in the search box
-       List<WebElement> listOfProducts = driver.findElements(By.xpath("//div[@class='a-section a-spacing-small a-spacing-top-small']//h2/a"));
-
-       scn.log("Number of product searched: " + listOfProducts.size());
-       logger.info("Number of product searched: " + listOfProducts.size());
-        //But as this step asks click on any link, we can choose to click on Index 0 of the list
-        listOfProducts.get(0).click();
-        scn.log("Click on the first Link in the List. Link Text: " + listOfProducts.get(0).getText());
-        logger.info("Click on the first Link in the List. Link Text: " + listOfProducts.get(0).getText());
+		searchPageObjects.clickOnFirstProd();
 	}
 
 	@Then("Product Description is displayed in new tab")
@@ -124,6 +109,7 @@ public class StepDefs {
 		//As product description click will open new tab, we need to switch the driver to the new tab
         //If you do not switch, you can not access the new tab html elements
         //This is how you do it
+		logger.info("Switching from Base Window to New Window");
         Set<String> handles = driver.getWindowHandles(); // get all the open windows
         scn.log("List of Window found: " + handles.size());
         logger.info("List of Window found: " + handles.size());
@@ -139,6 +125,7 @@ public class StepDefs {
         //Now driver can access new driver window, but can not access the orignal tab
         //Check product title is displayed
         WebElement productTitle = driver.findElement(By.id("productTitle"));
+        logger.info("Created webelement for productTitle");
         Assert.assertEquals("Product Title",true,productTitle.isDisplayed());
         scn.log("Product title header is matched and displayed as: " + productTitle.getText());
         logger.info("Product title header is matched and displayed as: " + productTitle.getText());
